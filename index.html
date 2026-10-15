@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Stride</title>
+<title>Stride: workout, weight and food tracker</title>
 <style>
 :root{--bg:#eef3f6;--card:#fff;--ink:#10222f;--mute:#5d7080;--line:#d9e2e8;--accent:#0b6e8a;--l0:#e1e9ee;--l1:#c4e4ee;--l2:#86c5da;--l3:#3f9bbd;--l4:#0b5f7e;--good:#1d8a52}
 @media(prefers-color-scheme:dark){:root{--bg:#0e1820;--card:#16242e;--ink:#e6eef3;--mute:#8da2b1;--line:#27394544;--line:#2a3c48;--accent:#5cc3e0;--l0:#21323d;--l1:#1f4e60;--l2:#2a7d98;--l3:#43a8c9;--l4:#8fe0f5;--good:#4cc989}}
@@ -41,6 +41,10 @@ ul.list li small{color:var(--mute);display:block}
 .bar div{height:100%;background:var(--good);border-radius:6px}
 .lift{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-top:8px}
 .empty{color:var(--mute)}
+.day{padding:10px 0;border-top:1px solid var(--line)}.day:first-child{border-top:0}
+.day ul.list li:first-child{border-top:0}.day small{color:var(--mute)}
+.weeknav{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.weeknav h2{margin:0;font-size:1rem;text-align:center}
 .hide{display:none}
 svg text{fill:var(--mute);font-size:11px}
 </style>
@@ -48,7 +52,7 @@ svg text{fill:var(--mute);font-size:11px}
 <body>
 <main>
 <h1>Stride</h1>
-<p class="sub">Stay Consistent. </p>
+<p class="sub">Log it, watch the grid fill in, hit your goals. Everything is saved in your browser.</p>
 <nav id="tabs" role="tablist"></nav>
 
 <section id="dash">
@@ -57,8 +61,26 @@ svg text{fill:var(--mute);font-size:11px}
     <div class="heatwrap"><div class="heat" id="heat"></div></div>
     <div class="legend">Less <i style="background:var(--l0)"></i><i style="background:var(--l1)"></i><i style="background:var(--l2)"></i><i style="background:var(--l3)"></i><i style="background:var(--l4)"></i> More (by minutes active)</div>
   </div>
+  <div class="card"><h2>Planned today</h2><div id="today-plan"></div></div>
   <div class="card"><h2>Goal progress</h2><div id="prog"></div></div>
   <div class="card"><h2>Recent workouts</h2><ul class="list" id="wlist"></ul></div>
+</section>
+
+<section id="plan" class="hide">
+  <div class="card"><h2>Plan a workout</h2>
+    <div class="row">
+      <label>Date<input id="p-date" type="date"></label>
+      <label>Workout type<input id="p-type" list="types" placeholder="Running, yoga, lifting..." autocomplete="off"></label>
+      <label>Planned minutes (optional)<input id="p-dur" type="number" min="0"></label>
+      <label>Repeat<select id="p-rep"><option value="1">Just this day</option><option value="4">Weekly for 4 weeks</option><option value="8">Weekly for 8 weeks</option><option value="12">Weekly for 12 weeks</option></select></label>
+    </div>
+    <label style="margin-top:12px">Details (exercises, route, target)<input id="p-notes"></label>
+    <button class="go" id="save-p">Add to plan</button>
+  </div>
+  <div class="card">
+    <div class="weeknav"><button class="ghost" id="wk-prev">Previous week</button><h2 id="wk-title"></h2><button class="ghost" id="wk-next">Next week</button></div>
+    <div id="week"></div>
+  </div>
 </section>
 
 <section id="workout" class="hide">
@@ -129,7 +151,7 @@ const pretty = s => parse(s).toLocaleDateString(undefined, { month: "short", day
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 // Tabs
-const TABS = [["dash", "Dashboard"], ["workout", "Log workout"], ["weight", "Weight"], ["food", "Food"], ["goals", "Goals"]];
+const TABS = [["dash", "Dashboard"], ["plan", "Plan"], ["workout", "Log workout"], ["weight", "Weight"], ["food", "Food"], ["goals", "Goals"]];
 $("tabs").innerHTML = TABS.map(([id, n]) => `<button role="tab" data-t="${id}">${n}</button>`).join("");
 function show(id) {
   TABS.forEach(([t]) => $(t).classList.toggle("hide", t !== id));
@@ -280,7 +302,50 @@ function render() {
   $("ftoday").innerHTML = (todays.length ? `<b>${tot} calories</b>${g.cal ? ` of ${g.cal} (${g.cal - tot >= 0 ? g.cal - tot + " left" : tot - g.cal + " over"})` : ""}<ul class="list">` + todays.map(f => `<li><div>${f.meal}: ${esc(f.what)}<small>${f.cal} cal</small></div><button class="x" aria-label="Delete food entry" data-delf="${f.id}">&times;</button></li>`).join("") + "</ul>" : '<span class="empty">Nothing logged today yet.</span>');
   const byDay = {}; S.food.forEach(f => byDay[f.date] = (byDay[f.date] || 0) + f.cal);
   $("fdays").innerHTML = Object.keys(byDay).sort().reverse().slice(0, 10).map(k => `<li><span>${pretty(k)}</span><b>${byDay[k]} cal</b></li>`).join("") || '<li class="empty">Daily totals will show up here.</li>';
+  renderPlan();
 }
+// Workout plan: planned sessions by date, checked off automatically when you log a matching workout
+const plans = () => S.plans || (S.plans = []);
+let weekOff = 0;
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
+const isDone = p => S.workouts.some(w => w.date === p.date && w.type.toLowerCase() === p.type.toLowerCase());
+const planRow = p => {
+  const done = isDone(p), status = done ? "Done" : p.date < today() ? "Missed" : "Planned";
+  return `<li><div><b>${esc(p.type)}</b>${p.dur ? ", " + p.dur + " min" : ""}<small>${status}${p.notes ? " | " + esc(p.notes) : ""}</small></div><span>${done ? "" : `<button class="ghost" data-logp="${p.id}">Log it</button> `}<button class="x" aria-label="Remove from plan" data-delp="${p.id}">&times;</button></span></li>`;
+};
+function renderPlan() {
+  const start = addDays(weekStart(), weekOff * 7), days = [...Array(7)].map((_, i) => addDays(start, i));
+  $("wk-title").textContent = pretty(days[0]) + " to " + pretty(days[6]);
+  $("week").innerHTML = days.map(d => {
+    const ps = plans().filter(p => p.date === d);
+    const extras = S.workouts.filter(w => w.date === d && !ps.some(p => p.type.toLowerCase() === w.type.toLowerCase()));
+    const name = parse(d).toLocaleDateString(undefined, { weekday: "long" }) + (d === today() ? " (today)" : "");
+    return `<div class="day"><b>${name}</b> <small>${pretty(d)}</small><ul class="list">` + ps.map(planRow).join("") +
+      extras.map(w => `<li><div><b>${esc(w.type)}</b>, ${w.dur} min<small>Extra, not in your plan</small></div></li>`).join("") +
+      (ps.length + extras.length ? "" : '<li class="empty">Nothing planned. Add a workout above.</li>') + "</ul></div>";
+  }).join("");
+  const tp = plans().filter(p => p.date === today());
+  $("today-plan").innerHTML = tp.length ? '<ul class="list">' + tp.map(planRow).join("") + "</ul>" : '<span class="empty">Nothing planned today. Add something on the Plan tab.</span>';
+}
+$("save-p").onclick = () => {
+  const type = $("p-type").value.trim(); if (!type) return alert("Add a workout type.");
+  const date = $("p-date").value || today(), n = +$("p-rep").value;
+  for (let i = 0; i < n; i++) plans().push({ id: uid(), date: addDays(date, 7 * i), type, dur: +$("p-dur").value || 0, notes: $("p-notes").value.trim() });
+  save(); ["p-type", "p-dur", "p-notes"].forEach(i => $(i).value = ""); $("p-rep").value = "1";
+  weekOff = Math.round((parse(weekStart(parse(date))) - parse(weekStart())) / (7 * 864e5)); render();
+};
+$("wk-prev").onclick = () => { weekOff--; renderPlan(); };
+$("wk-next").onclick = () => { weekOff++; renderPlan(); };
+document.body.addEventListener("click", e => {
+  const d = e.target.dataset;
+  if (d.delp) { S.plans = plans().filter(p => p.id !== d.delp); save(); render(); }
+  if (d.logp) {
+    const p = plans().find(x => x.id === d.logp); if (!p) return;
+    show("workout"); $("w-type").value = p.type; $("w-date").value = p.date; $("w-dur").value = p.dur || ""; $("w-notes").value = p.notes; adaptForm();
+  }
+});
+["p-date"].forEach(i => $(i).value = today());
+
 // GitHub sync: data.json in a repo you choose, read and written through the GitHub API
 const SK = "stride-sync";
 let cfg = {};
