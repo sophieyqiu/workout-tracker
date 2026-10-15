@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stride: workout, weight and food tracker</title>
+<style>
+:root{--bg:#eef3f6;--card:#fff;--ink:#10222f;--mute:#5d7080;--line:#d9e2e8;--accent:#0b6e8a;--l0:#e1e9ee;--l1:#c4e4ee;--l2:#86c5da;--l3:#3f9bbd;--l4:#0b5f7e;--good:#1d8a52}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1820;--card:#16242e;--ink:#e6eef3;--mute:#8da2b1;--line:#27394544;--line:#2a3c48;--accent:#5cc3e0;--l0:#21323d;--l1:#1f4e60;--l2:#2a7d98;--l3:#43a8c9;--l4:#8fe0f5;--good:#4cc989}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Avenir Next","Segoe UI",system-ui,sans-serif;padding:0 16px 48px}
+main{max-width:880px;margin:0 auto}
+h1{font-size:1.9rem;margin:28px 0 4px;letter-spacing:-.02em}
+h2{font-size:1.15rem;margin:0 0 12px}
+p.sub{margin:0 0 20px;color:var(--mute)}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+nav button{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:999px;font:inherit;cursor:pointer}
+nav button[aria-selected=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+label{display:block;font-size:.85rem;color:var(--mute)}
+input,select,textarea{width:100%;margin-top:4px;padding:9px 10px;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px}
+button.go{background:var(--accent);color:#fff;border:0;padding:10px 18px;border-radius:8px;font:inherit;cursor:pointer;margin-top:14px}
+button.ghost{background:none;border:1px solid var(--line);color:var(--ink);padding:6px 12px;border-radius:8px;font:inherit;cursor:pointer}
+button.x{background:none;border:0;color:var(--mute);cursor:pointer;font-size:1.1rem}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.stat b{display:block;font-size:1.6rem;letter-spacing:-.02em}
+.stat span{color:var(--mute);font-size:.85rem}
+.heatwrap{overflow-x:auto;padding-bottom:6px}
+.heat{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,14px);grid-auto-columns:14px;gap:3px;width:max-content}
+.heat i{border-radius:3px;background:var(--l0)}
+.heat i[data-l="1"]{background:var(--l1)}.heat i[data-l="2"]{background:var(--l2)}.heat i[data-l="3"]{background:var(--l3)}.heat i[data-l="4"]{background:var(--l4)}
+.legend{display:flex;align-items:center;gap:4px;font-size:.8rem;color:var(--mute);margin-top:10px}
+.legend i{width:14px;height:14px;border-radius:3px;display:inline-block}
+ul.list{list-style:none;margin:0;padding:0}
+ul.list li{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+ul.list li small{color:var(--mute);display:block}
+.bar{height:10px;background:var(--l0);border-radius:6px;overflow:hidden;margin:6px 0 4px}
+.bar div{height:100%;background:var(--good);border-radius:6px}
+.lift{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-top:8px}
+.empty{color:var(--mute)}
+.hide{display:none}
+svg text{fill:var(--mute);font-size:11px}
+</style>
+</head>
+<body>
+<main>
+<h1>Stride</h1>
+<p class="sub">Stay Consistent. </p>
+<nav id="tabs" role="tablist"></nav>
+
+<section id="dash">
+  <div class="stats" id="stats"></div>
+  <div class="card"><h2>Activity, last 26 weeks</h2>
+    <div class="heatwrap"><div class="heat" id="heat"></div></div>
+    <div class="legend">Less <i style="background:var(--l0)"></i><i style="background:var(--l1)"></i><i style="background:var(--l2)"></i><i style="background:var(--l3)"></i><i style="background:var(--l4)"></i> More (by minutes active)</div>
+  </div>
+  <div class="card"><h2>Goal progress</h2><div id="prog"></div></div>
+  <div class="card"><h2>Recent workouts</h2><ul class="list" id="wlist"></ul></div>
+</section>
+
+<section id="workout" class="hide">
+  <div class="card"><h2>Log a workout</h2>
+    <div class="row">
+      <label>Workout type<input id="w-type" list="types" placeholder="Running, yoga, surfing..." autocomplete="off"></label>
+      <label>Date<input id="w-date" type="date"></label>
+      <label>Duration (min)<input id="w-dur" type="number" min="0"></label>
+      <label id="f-dist">Distance (miles)<input id="w-dist" type="number" min="0" step="0.01"></label>
+      <label id="f-int">Intensity<select id="w-int"><option value="">--</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+    </div>
+    <datalist id="types"><option>Running</option><option>Biking</option><option>Walking</option><option>Yoga</option><option>Pilates</option><option>Weightlifting</option><option>Surfing</option><option>Swimming</option><option>Hiking</option></datalist>
+    <div id="f-lift" class="hide"><div class="lift"><small>Exercise</small><small>Sets</small><small>Reps</small><small>Weight (lb)</small></div><div id="lifts"></div>
+      <button type="button" class="ghost" id="addlift" style="margin-top:10px">Add exercise</button></div>
+    <label style="margin-top:12px">Notes<textarea id="w-notes" rows="2"></textarea></label>
+    <button class="go" id="save-w">Save workout</button>
+  </div>
+</section>
+
+<section id="weight" class="hide">
+  <div class="card"><h2>Log your weight</h2>
+    <div class="row"><label>Date<input id="b-date" type="date"></label><label>Weight (lb)<input id="b-val" type="number" step="0.1" min="0"></label></div>
+    <button class="go" id="save-b">Save weight</button></div>
+  <div class="card"><h2>Trend</h2><div id="chart"></div><ul class="list" id="blist"></ul></div>
+</section>
+
+<section id="food" class="hide">
+  <div class="card"><h2>Log food</h2>
+    <div class="row"><label>Date<input id="f-date" type="date"></label>
+      <label>Meal<select id="f-meal"><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select></label>
+      <label>What you ate<input id="f-what"></label><label>Calories<input id="f-cal" type="number" min="0"></label></div>
+    <button class="go" id="save-f">Save food</button></div>
+  <div class="card"><h2>Today</h2><div id="ftoday"></div></div>
+  <div class="card"><h2>Recent days</h2><ul class="list" id="fdays"></ul></div>
+</section>
+
+<section id="goals" class="hide">
+  <div class="card"><h2>Your goals</h2>
+    <div class="row"><label>Goal weight (lb)<input id="g-w" type="number" step="0.1"></label>
+      <label>Workouts per week<input id="g-wk" type="number" min="1" max="14"></label>
+      <label>Daily calorie limit<input id="g-cal" type="number" min="0"></label></div>
+    <button class="go" id="save-g">Save goals</button></div>
+  <div class="card"><h2>Backup</h2><p class="sub">Your data lives in this browser only. Download a backup now and then.</p>
+    <button class="ghost" id="exp">Download backup</button>
+    <button class="ghost" id="imp">Restore backup</button><input type="file" id="impf" accept=".json" class="hide"></div>
+  <div class="card"><h2>Sync with GitHub</h2>
+    <p class="sub">Keeps your data in a file in a GitHub repository so every device sees the same entries. Enter these once on each device.</p>
+    <div class="row"><label>Data repository (owner/name)<input id="s-repo" placeholder="yourname/stride-data" autocomplete="off"></label>
+      <label>File name<input id="s-path" placeholder="data.json" autocomplete="off"></label>
+      <label>Access token<input id="s-token" type="password" autocomplete="off"></label></div>
+    <button class="go" id="s-save">Connect and sync</button>
+    <button class="ghost" id="s-off" style="margin-left:8px">Disconnect this device</button>
+    <p class="sub" id="sync-status" style="margin:10px 0 0">Sync is off.</p></div>
+</section>
+</main>
+
+<script>
+const KEY = "stride-data-v1";
+let S = { workouts: [], weights: [], food: [], goals: {} };
+try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(S, JSON.parse(raw)); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { alert("Could not save. Your browser may be blocking storage."); } queuePush(); };
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const iso = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const today = () => iso(new Date());
+const parse = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const pretty = s => parse(s).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+// Tabs
+const TABS = [["dash", "Dashboard"], ["workout", "Log workout"], ["weight", "Weight"], ["food", "Food"], ["goals", "Goals"]];
+$("tabs").innerHTML = TABS.map(([id, n]) => `<button role="tab" data-t="${id}">${n}</button>`).join("");
+function show(id) {
+  TABS.forEach(([t]) => $(t).classList.toggle("hide", t !== id));
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.t === id));
+  render();
+}
+$("tabs").onclick = e => { if (e.target.dataset.t) show(e.target.dataset.t); };
+
+// Workout form: fields change with the type
+const kind = t => {
+  t = t.toLowerCase();
+  if (/run|bik|cycl|walk|swim|hik|row|jog/.test(t)) return "cardio";
+  if (/lift|weight|strength|gym/.test(t)) return "lift";
+  return "other";
+};
+function adaptForm() {
+  const k = kind($("w-type").value);
+  $("f-dist").classList.toggle("hide", k !== "cardio");
+  $("f-lift").classList.toggle("hide", k !== "lift");
+  if (k === "lift" && !$("lifts").children.length) addLift();
+}
+function addLift() {
+  const d = document.createElement("div"); d.className = "lift";
+  d.innerHTML = '<input placeholder="Squat"><input type="number" min="0"><input type="number" min="0"><input type="number" min="0" step="0.5">';
+  $("lifts").appendChild(d);
+}
+$("w-type").oninput = adaptForm;
+$("addlift").onclick = addLift;
+$("save-w").onclick = () => {
+  const type = $("w-type").value.trim(), dur = +$("w-dur").value;
+  if (!type || !dur) return alert("Add a workout type and a duration in minutes.");
+  const w = { id: uid(), date: $("w-date").value || today(), type, dur, notes: $("w-notes").value.trim() };
+  if ($("w-dist").value && kind(type) === "cardio") w.dist = +$("w-dist").value;
+  if ($("w-int").value) w.intensity = +$("w-int").value;
+  if (kind(type) === "lift") {
+    w.lifts = [...$("lifts").children].map(r => { const i = r.querySelectorAll("input"); return { name: i[0].value.trim(), sets: i[1].value, reps: i[2].value, weight: i[3].value }; }).filter(l => l.name);
+  }
+  S.workouts.push(w); save();
+  ["w-type", "w-dur", "w-dist", "w-notes"].forEach(i => $(i).value = ""); $("w-int").value = ""; $("lifts").innerHTML = ""; adaptForm();
+  show("dash");
+};
+
+$("save-b").onclick = () => {
+  const v = +$("b-val").value; if (!v) return alert("Enter your weight.");
+  const date = $("b-date").value || today();
+  S.weights = S.weights.filter(w => w.date !== date); S.weights.push({ date, v }); save(); $("b-val").value = ""; render();
+};
+$("save-f").onclick = () => {
+  const what = $("f-what").value.trim(); if (!what) return alert("Describe what you ate.");
+  S.food.push({ id: uid(), date: $("f-date").value || today(), meal: $("f-meal").value, what, cal: +$("f-cal").value || 0 });
+  save(); $("f-what").value = ""; $("f-cal").value = ""; render();
+};
+$("save-g").onclick = () => {
+  S.goals = { weight: +$("g-w").value || null, weekly: +$("g-wk").value || null, cal: +$("g-cal").value || null };
+  save(); show("dash");
+};
+$("exp").onclick = () => {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(S)], { type: "application/json" }));
+  a.download = "stride-backup-" + today() + ".json"; a.click();
+};
+$("imp").onclick = () => $("impf").click();
+$("impf").onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(t => { try { S = Object.assign({ workouts: [], weights: [], food: [], goals: {} }, JSON.parse(t)); save(); render(); alert("Backup restored."); } catch (x) { alert("That file is not a valid backup."); } });
+};
+document.body.addEventListener("click", e => {
+  const d = e.target.dataset;
+  if (d.delw) { S.workouts = S.workouts.filter(w => w.id !== d.delw); save(); render(); }
+  if (d.delb) { S.weights = S.weights.filter(w => w.date !== d.delb); save(); render(); }
+  if (d.delf) { S.food = S.food.filter(f => f.id !== d.delf); save(); render(); }
+});
+
+// Calculations
+const minutesByDay = () => { const m = {}; S.workouts.forEach(w => m[w.date] = (m[w.date] || 0) + w.dur); return m; };
+const level = m => m <= 0 ? 0 : m < 20 ? 1 : m < 40 ? 2 : m < 60 ? 3 : 4;
+function streaks() {
+  const days = new Set(S.workouts.map(w => w.date));
+  let cur = 0, d = new Date(); if (!days.has(iso(d))) d.setDate(d.getDate() - 1);
+  while (days.has(iso(d))) { cur++; d.setDate(d.getDate() - 1); }
+  let best = 0, run = 0; const sorted = [...days].sort();
+  sorted.forEach((s, i) => { run = i && (parse(s) - parse(sorted[i - 1])) / 864e5 === 1 ? run + 1 : 1; best = Math.max(best, run); });
+  return { cur, best };
+}
+function weekStart(d = new Date()) { const s = new Date(d); s.setDate(s.getDate() - s.getDay()); return iso(s); }
+const weightsSorted = () => [...S.weights].sort((a, b) => a.date.localeCompare(b.date));
+
+// Rendering
+function render() {
+  $("g-w").value = S.goals.weight ?? ""; $("g-wk").value = S.goals.weekly ?? ""; $("g-cal").value = S.goals.cal ?? "";
+  ["w-date", "b-date", "f-date"].forEach(i => { if (!$(i).value) $(i).value = today(); });
+  const m = minutesByDay(), st = streaks(), ws = weekStart(), ww = weightsSorted();
+  const weekCount = new Set(S.workouts.filter(w => w.date >= ws).map(w => w.date)).size;
+  const last = ww[ww.length - 1];
+
+  $("stats").innerHTML = [
+    [st.cur + (st.cur === 1 ? " day" : " days"), "Current streak"],
+    [st.best + (st.best === 1 ? " day" : " days"), "Longest streak"],
+    [weekCount + (S.goals.weekly ? " / " + S.goals.weekly : ""), "Active days this week"],
+    [last ? last.v + " lb" : "None yet", "Latest weight"]
+  ].map(([a, b]) => `<div class="stat"><b>${a}</b><span>${b}</span></div>`).join("");
+
+  // Heat grid: columns are weeks, rows are Sun to Sat
+  const start = new Date(); start.setDate(start.getDate() - start.getDay() - 25 * 7);
+  let h = "";
+  for (let i = 0; i < 26 * 7; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const k = iso(d), mins = m[k] || 0;
+    h += d > new Date() ? '<i style="visibility:hidden"></i>' : `<i data-l="${level(mins)}" title="${pretty(k)}: ${mins} min"></i>`;
+  }
+  $("heat").innerHTML = h;
+
+  // Goal progress
+  let p = "";
+  const g = S.goals;
+  if (g.weekly) { const pc = Math.min(100, weekCount / g.weekly * 100); p += `<div>Workout days this week: ${weekCount} of ${g.weekly}<div class="bar"><div style="width:${pc}%"></div></div></div>`; }
+  if (g.weight && ww.length) {
+    const first = ww[0].v, now = last.v, total = first - g.weight, done = first - now;
+    const pc = total === 0 ? 100 : Math.max(0, Math.min(100, done / total * 100));
+    p += `<div style="margin-top:12px">Weight: ${first} lb start, ${now} lb now, ${g.weight} lb goal (${Math.abs(now - g.weight).toFixed(1)} lb to go)<div class="bar"><div style="width:${pc}%"></div></div></div>`;
+  }
+  if (g.cal) {
+    const byDay = {}; S.food.forEach(f => byDay[f.date] = (byDay[f.date] || 0) + f.cal);
+    const logged = Object.keys(byDay), ok = logged.filter(k => byDay[k] <= g.cal).length;
+    if (logged.length) p += `<div style="margin-top:12px">Days within ${g.cal} calories: ${ok} of ${logged.length} logged<div class="bar"><div style="width:${ok / logged.length * 100}%"></div></div></div>`;
+  }
+  $("prog").innerHTML = p || '<span class="empty">Set your goals on the Goals tab to see progress here.</span>';
+
+  // Workout list
+  const recent = [...S.workouts].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15);
+  $("wlist").innerHTML = recent.map(w => {
+    const bits = [w.dur + " min"];
+    if (w.dist) bits.push(w.dist + " mi");
+    if (w.intensity) bits.push("intensity " + w.intensity + "/5");
+    if (w.lifts && w.lifts.length) bits.push(w.lifts.map(l => `${esc(l.name)} ${l.sets || "?"}x${l.reps || "?"} @ ${l.weight || "?"} lb`).join(", "));
+    return `<li><div><b>${esc(w.type)}</b> on ${pretty(w.date)}<small>${bits.join(", ")}${w.notes ? " | " + esc(w.notes) : ""}</small></div><button class="x" aria-label="Delete workout" data-delw="${w.id}">&times;</button></li>`;
+  }).join("") || '<li class="empty">No workouts yet. Log your first one on the Log workout tab.</li>';
+
+  // Weight chart and list
+  if (ww.length > 1) {
+    const W = 600, H = 180, pad = 30, vals = ww.map(w => w.v), lo = Math.min(...vals) - 1, hi = Math.max(...vals) + 1;
+    const x = i => pad + i * (W - 2 * pad) / (ww.length - 1), y = v => H - pad - (v - lo) / (hi - lo) * (H - 2 * pad);
+    $("chart").innerHTML = `<div class="heatwrap"><svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Weight over time"><polyline fill="none" stroke="var(--accent)" stroke-width="2.5" points="${ww.map((w, i) => x(i) + "," + y(w.v)).join(" ")}"/>${ww.map((w, i) => `<circle cx="${x(i)}" cy="${y(w.v)}" r="3.5" fill="var(--accent)"/>`).join("")}<text x="2" y="${y(hi - 1) + 4}">${(hi - 1).toFixed(0)}</text><text x="2" y="${y(lo + 1) + 4}">${(lo + 1).toFixed(0)}</text></svg></div>`;
+  } else $("chart").innerHTML = '<p class="empty">Log at least two weigh-ins to see a trend line.</p>';
+  $("blist").innerHTML = [...ww].reverse().slice(0, 10).map(w => `<li><span>${pretty(w.date)}: <b>${w.v} lb</b></span><button class="x" aria-label="Delete weigh-in" data-delb="${w.date}">&times;</button></li>`).join("");
+
+  // Food
+  const t = today(), todays = S.food.filter(f => f.date === t), tot = todays.reduce((a, f) => a + f.cal, 0);
+  $("ftoday").innerHTML = (todays.length ? `<b>${tot} calories</b>${g.cal ? ` of ${g.cal} (${g.cal - tot >= 0 ? g.cal - tot + " left" : tot - g.cal + " over"})` : ""}<ul class="list">` + todays.map(f => `<li><div>${f.meal}: ${esc(f.what)}<small>${f.cal} cal</small></div><button class="x" aria-label="Delete food entry" data-delf="${f.id}">&times;</button></li>`).join("") + "</ul>" : '<span class="empty">Nothing logged today yet.</span>');
+  const byDay = {}; S.food.forEach(f => byDay[f.date] = (byDay[f.date] || 0) + f.cal);
+  $("fdays").innerHTML = Object.keys(byDay).sort().reverse().slice(0, 10).map(k => `<li><span>${pretty(k)}</span><b>${byDay[k]} cal</b></li>`).join("") || '<li class="empty">Daily totals will show up here.</li>';
+}
+// GitHub sync: data.json in a repo you choose, read and written through the GitHub API
+const SK = "stride-sync";
+let cfg = {};
+try { cfg = JSON.parse(localStorage.getItem(SK)) || {}; } catch (e) {}
+const b64 = s => btoa(unescape(encodeURIComponent(s)));
+const unb64 = s => decodeURIComponent(escape(atob(s.replace(/\s/g, ""))));
+const api = () => `https://api.github.com/repos/${cfg.repo}/contents/${cfg.path || "data.json"}`;
+const hdr = () => ({ Authorization: "Bearer " + cfg.token, Accept: "application/vnd.github+json" });
+const setStatus = t => { $("sync-status").textContent = t; };
+const clock = () => new Date().toLocaleTimeString();
+async function remoteGet() {
+  const r = await fetch(api(), { headers: hdr(), cache: "no-store" });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error("GitHub returned " + r.status + ". Check the repository name and token.");
+  const j = await r.json();
+  return { sha: j.sha, data: JSON.parse(unb64(j.content)) };
+}
+async function push() {
+  const cur = await remoteGet();
+  const body = { message: "Update Stride data", content: b64(JSON.stringify(S, null, 1)) };
+  if (cur) body.sha = cur.sha;
+  const r = await fetch(api(), { method: "PUT", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error("Could not save to GitHub (" + r.status + ").");
+}
+async function pull(first) {
+  if (!cfg.repo || !cfg.token) return setStatus("Sync is off.");
+  setStatus("Loading from GitHub...");
+  try {
+    const cur = await remoteGet();
+    const hasLocal = S.workouts.length + S.weights.length + S.food.length > 0;
+    if (!cur) { await push(); return setStatus("Created " + (cfg.path || "data.json") + " in GitHub."); }
+    if (first && hasLocal && !confirm("This device has entries that are not in GitHub yet. Press OK to replace them with the GitHub copy, or Cancel to upload this device's entries instead.")) {
+      await push(); return setStatus("Uploaded this device's data at " + clock() + ".");
+    }
+    S = Object.assign({ workouts: [], weights: [], food: [], goals: {} }, cur.data);
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+    render(); setStatus("Synced with GitHub at " + clock() + ".");
+  } catch (e) { setStatus(e.message); }
+}
+let pushTimer;
+function queuePush() {
+  if (!cfg.repo || !cfg.token) return;
+  clearTimeout(pushTimer); setStatus("Saving to GitHub...");
+  pushTimer = setTimeout(async () => {
+    try { await push(); setStatus("Saved to GitHub at " + clock() + "."); }
+    catch (e) { setStatus(e.message + " Your data is still saved in this browser."); }
+  }, 1200);
+}
+$("s-repo").value = cfg.repo || ""; $("s-path").value = cfg.path || "data.json"; $("s-token").value = cfg.token || "";
+$("s-save").onclick = () => {
+  cfg = { repo: $("s-repo").value.trim(), path: $("s-path").value.trim() || "data.json", token: $("s-token").value.trim() };
+  if (!/^[\w.-]+\/[\w.-]+$/.test(cfg.repo) || !cfg.token) return setStatus("Enter the repository as owner/name and paste your token.");
+  try { localStorage.setItem(SK, JSON.stringify(cfg)); } catch (e) {}
+  pull(true);
+};
+$("s-off").onclick = () => { cfg = {}; try { localStorage.removeItem(SK); } catch (e) {} $("s-token").value = ""; setStatus("Sync is off on this device. Your data stays in GitHub."); };
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pull(); });
+adaptForm();
+show("dash");
+pull();
+</script>
+</body>
+</html>
