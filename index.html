@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Stride</title>
+<title>Stride: workout, weight and food tracker</title>
 <style>
-:root{--bg:#eef3f6;--card:#fff;--ink:#10222f;--mute:#5d7080;--line:#d9e2e8;--accent:#0b6e8a;--l0:#e1e9ee;--l1:#c4e4ee;--l2:#86c5da;--l3:#3f9bbd;--l4:#0b5f7e;--good:#1d8a52}
-@media(prefers-color-scheme:dark){:root{--bg:#0e1820;--card:#16242e;--ink:#e6eef3;--mute:#8da2b1;--line:#27394544;--line:#2a3c48;--accent:#5cc3e0;--l0:#21323d;--l1:#1f4e60;--l2:#2a7d98;--l3:#43a8c9;--l4:#8fe0f5;--good:#4cc989}}
+:root{--bg:#eef3f6;--card:#fff;--ink:#10222f;--mute:#5d7080;--line:#d9e2e8;--accent:#0b6e8a;--l0:#e1e9ee;--l1:#c4e4ee;--l2:#86c5da;--l3:#3f9bbd;--l4:#0b5f7e;--good:#1d8a52;--cardio:#2b8fd0;--lift:#7a5ad8;--sport:#e8892b;--rec:#2fae7b;--other:#8a98a4}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1820;--card:#16242e;--ink:#e6eef3;--mute:#8da2b1;--line:#27394544;--line:#2a3c48;--accent:#5cc3e0;--l0:#21323d;--l1:#1f4e60;--l2:#2a7d98;--l3:#43a8c9;--l4:#8fe0f5;--good:#4cc989;--cardio:#4fb0ee;--lift:#a48cf5;--sport:#f5a04e;--rec:#4fd19b;--other:#8da2b1}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Avenir Next","Segoe UI",system-ui,sans-serif;padding:0 16px 48px}
 main{max-width:880px;margin:0 auto}
@@ -29,9 +29,12 @@ button.x{background:none;border:0;color:var(--mute);cursor:pointer;font-size:1.1
 .stat b{display:block;font-size:1.6rem;letter-spacing:-.02em}
 .stat span{color:var(--mute);font-size:.85rem}
 .heatwrap{overflow-x:auto;padding-bottom:6px}
-.heat{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,14px);grid-auto-columns:14px;gap:3px;width:max-content}
-.heat i{border-radius:3px;background:var(--l0)}
-.heat i[data-l="1"]{background:var(--l1)}.heat i[data-l="2"]{background:var(--l2)}.heat i[data-l="3"]{background:var(--l3)}.heat i[data-l="4"]{background:var(--l4)}
+.heat{display:grid;grid-template-columns:56px repeat(7,24px);gap:3px;align-items:center;width:max-content}
+.heat span{font-size:.72rem;color:var(--mute);white-space:nowrap}
+.heat i{height:24px;border-radius:4px;background:var(--l0)}
+.heat i[data-c]{background:color-mix(in srgb,var(--c) calc(var(--p) * 1%),var(--l0))}
+.heat i[data-l="1"]{--p:30}.heat i[data-l="2"]{--p:55}.heat i[data-l="3"]{--p:78}.heat i[data-l="4"]{--p:100}
+.heat i[data-c="cardio"]{--c:var(--cardio)}.heat i[data-c="lift"]{--c:var(--lift)}.heat i[data-c="sport"]{--c:var(--sport)}.heat i[data-c="rec"]{--c:var(--rec)}.heat i[data-c="other"]{--c:var(--other)}
 .legend{display:flex;align-items:center;gap:4px;font-size:.8rem;color:var(--mute);margin-top:10px}
 .legend i{width:14px;height:14px;border-radius:3px;display:inline-block}
 ul.list{list-style:none;margin:0;padding:0}
@@ -45,6 +48,15 @@ ul.list li small{color:var(--mute);display:block}
 .day ul.list li:first-child{border-top:0}.day small{color:var(--mute)}
 .weeknav{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
 .weeknav h2{margin:0;font-size:1rem;text-align:center}
+.tl{position:relative;margin:0;padding:0 0 0 22px;list-style:none;border-left:2px solid var(--line)}
+.tl li{position:relative;padding:0 0 22px 6px;line-height:1.6}
+.tl li::before{content:"";position:absolute;left:-29px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--card)}
+.tl .when{font-weight:600}.delta{color:var(--mute);font-size:.9em}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.thumbs img{height:96px;min-width:72px;border-radius:8px;cursor:zoom-in;object-fit:cover;background:var(--l0)}
+.thumbs img.big{height:auto;max-width:100%;cursor:zoom-out}
+.entry{white-space:pre-wrap}
+.mic[aria-pressed=true]{background:#c0392b;color:#fff;border-color:#c0392b}
 .hide{display:none}
 svg text{fill:var(--mute);font-size:11px}
 </style>
@@ -52,14 +64,15 @@ svg text{fill:var(--mute);font-size:11px}
 <body>
 <main>
 <h1>Stride</h1>
-<p class="sub">Consistency</p>
+<p class="sub">Log it, watch the grid fill in, hit your goals. Everything is saved in your browser.</p>
 <nav id="tabs" role="tablist"></nav>
 
 <section id="dash">
   <div class="stats" id="stats"></div>
-  <div class="card"><h2>Activity, last 26 weeks</h2>
+  <div class="card"><div class="weeknav"><button class="ghost" id="g-old">Older</button><h2 id="g-title">Activity by week</h2><button class="ghost" id="g-new">Newer</button></div>
     <div class="heatwrap"><div class="heat" id="heat"></div></div>
-    <div class="legend">Less <i style="background:var(--l0)"></i><i style="background:var(--l1)"></i><i style="background:var(--l2)"></i><i style="background:var(--l3)"></i><i style="background:var(--l4)"></i> More (by minutes active)</div>
+    <div class="legend" style="flex-wrap:wrap;gap:6px 14px"><span><i style="background:var(--cardio)"></i> Cardio</span><span><i style="background:var(--lift)"></i> Weightlifting</span><span><i style="background:var(--sport)"></i> Sports</span><span><i style="background:var(--rec)"></i> Recovery</span><span><i style="background:var(--other)"></i> Other</span></div>
+    <div class="legend" style="flex-wrap:wrap">Shade by minutes: Less <i style="background:color-mix(in srgb,var(--cardio) 30%,var(--l0))"></i><i style="background:color-mix(in srgb,var(--cardio) 55%,var(--l0))"></i><i style="background:color-mix(in srgb,var(--cardio) 78%,var(--l0))"></i><i style="background:var(--cardio)"></i> More. Each day takes the color of its biggest category.</div>
   </div>
   <div class="card"><h2>Planned today</h2><div id="today-plan"></div></div>
   <div class="card"><h2>Goal progress</h2><div id="prog"></div></div>
@@ -91,6 +104,7 @@ svg text{fill:var(--mute);font-size:11px}
       <label>Duration (min)<input id="w-dur" type="number" min="0"></label>
       <label id="f-dist">Distance (miles)<input id="w-dist" type="number" min="0" step="0.01"></label>
       <label id="f-int">Intensity<select id="w-int"><option value="">--</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+      <label>Category<select id="w-cat"><option value="">Auto from type</option><option value="cardio">Cardio</option><option value="lift">Weightlifting</option><option value="sport">Sports</option><option value="rec">Recovery</option></select></label>
     </div>
     <datalist id="types"><option>Running</option><option>Biking</option><option>Walking</option><option>Yoga</option><option>Pilates</option><option>Weightlifting</option><option>Surfing</option><option>Swimming</option><option>Hiking</option></datalist>
     <div id="f-lift" class="hide"><div class="lift"><small>Exercise</small><small>Sets</small><small>Reps</small><small>Weight (lb)</small></div><div id="lifts"></div>
@@ -115,6 +129,35 @@ svg text{fill:var(--mute);font-size:11px}
     <button class="go" id="save-f">Save food</button></div>
   <div class="card"><h2>Today</h2><div id="ftoday"></div></div>
   <div class="card"><h2>Recent days</h2><ul class="list" id="fdays"></ul></div>
+</section>
+
+<section id="checkin" class="hide">
+  <div class="card"><h2>Weight goal timeline</h2><div id="tl-sum"></div></div>
+  <div class="card"><h2>New check-in</h2>
+    <div class="row">
+      <label>Date<input id="c-date" type="date"></label>
+      <label>Weight (lb)<input id="c-wt" type="number" step="0.1" min="0"></label>
+      <label>Waist (in)<input id="c-waist" type="number" step="0.1" min="0"></label>
+      <label>Chest (in)<input id="c-chest" type="number" step="0.1" min="0"></label>
+      <label>Hips (in)<input id="c-hips" type="number" step="0.1" min="0"></label>
+      <label>Arm (in)<input id="c-arm" type="number" step="0.1" min="0"></label>
+      <label>Thigh (in)<input id="c-thigh" type="number" step="0.1" min="0"></label>
+    </div>
+    <label style="margin-top:12px">Progress photos<input id="c-photos" type="file" accept="image/*" multiple></label>
+    <label style="margin-top:12px">Notes<textarea id="c-notes" rows="2"></textarea></label>
+    <button class="go" id="save-c">Save check-in</button>
+    <p class="sub" id="c-status" style="margin:8px 0 0"></p></div>
+  <div class="card"><h2>Timeline</h2><ul class="tl" id="tl"></ul></div>
+</section>
+
+<section id="journal" class="hide">
+  <div class="card"><h2>New entry</h2>
+    <div class="row"><label>Date<input id="j-date" type="date"></label><label>Title (optional)<input id="j-title"></label></div>
+    <label style="margin-top:12px">Entry<textarea id="j-text" rows="6"></textarea></label>
+    <button class="go" id="save-j">Save entry</button>
+    <button class="ghost mic" id="mic" aria-pressed="false" style="margin-left:8px">Start dictating</button>
+    <p class="sub" id="mic-status" style="margin:8px 0 0"></p></div>
+  <div class="card"><h2>Entries</h2><input id="j-search" placeholder="Search entries" style="margin:0 0 8px"><ul class="list" id="jlist"></ul></div>
 </section>
 
 <section id="goals" class="hide">
@@ -151,7 +194,7 @@ const pretty = s => parse(s).toLocaleDateString(undefined, { month: "short", day
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 // Tabs
-const TABS = [["dash", "Dashboard"], ["plan", "Plan"], ["workout", "Log workout"], ["weight", "Weight"], ["food", "Food"], ["goals", "Goals"]];
+const TABS = [["dash", "Dashboard"], ["plan", "Plan"], ["workout", "Log workout"], ["weight", "Weight"], ["food", "Food"], ["checkin", "Check-ins"], ["journal", "Journal"], ["goals", "Goals"]];
 $("tabs").innerHTML = TABS.map(([id, n]) => `<button role="tab" data-t="${id}">${n}</button>`).join("");
 function show(id) {
   TABS.forEach(([t]) => $(t).classList.toggle("hide", t !== id));
@@ -163,7 +206,7 @@ $("tabs").onclick = e => { if (e.target.dataset.t) show(e.target.dataset.t); };
 // Workout form: fields change with the type
 const kind = t => {
   t = t.toLowerCase();
-  if (/run|bik|cycl|walk|swim|hik|row|jog/.test(t)) return "cardio";
+  if (/run|bik|cycl|walk|swim|hik|row|jog|treadmill/.test(t)) return "cardio";
   if (/lift|weight|strength|gym/.test(t)) return "lift";
   return "other";
 };
@@ -186,11 +229,12 @@ $("save-w").onclick = () => {
   const w = { id: uid(), date: $("w-date").value || today(), type, dur, notes: $("w-notes").value.trim() };
   if ($("w-dist").value && kind(type) === "cardio") w.dist = +$("w-dist").value;
   if ($("w-int").value) w.intensity = +$("w-int").value;
+  if ($("w-cat").value) w.cat = $("w-cat").value;
   if (kind(type) === "lift") {
     w.lifts = [...$("lifts").children].map(r => { const i = r.querySelectorAll("input"); return { name: i[0].value.trim(), sets: i[1].value, reps: i[2].value, weight: i[3].value }; }).filter(l => l.name);
   }
   S.workouts.push(w); save();
-  ["w-type", "w-dur", "w-dist", "w-notes"].forEach(i => $(i).value = ""); $("w-int").value = ""; $("lifts").innerHTML = ""; adaptForm();
+  ["w-type", "w-dur", "w-dist", "w-notes"].forEach(i => $(i).value = ""); $("w-int").value = ""; $("w-cat").value = ""; $("lifts").innerHTML = ""; adaptForm();
   show("dash");
 };
 
@@ -227,6 +271,17 @@ document.body.addEventListener("click", e => {
 // Calculations
 const minutesByDay = () => { const m = {}; S.workouts.forEach(w => m[w.date] = (m[w.date] || 0) + w.dur); return m; };
 const level = m => m <= 0 ? 0 : m < 20 ? 1 : m < 40 ? 2 : m < 60 ? 3 : 4;
+let gridOff = 0;
+const CATS = { cardio: "Cardio", lift: "Weightlifting", sport: "Sports", rec: "Recovery", other: "Other" };
+const autoCat = t => {
+  t = t.toLowerCase();
+  if (/pilates|weight|lift|strength|gym|power yoga|crossfit/.test(t)) return "lift";
+  if (/stretch|yoga|mobility|foam|massage/.test(t)) return "rec";
+  if (/bik|cycl|run|jog|walk|treadmill|hik|swim|row|elliptical/.test(t)) return "cardio";
+  if (/surf|pickleball|soccer|tennis|frisbee|basketball|volleyball|golf|ski|climb|paddle|skate/.test(t)) return "sport";
+  return "other";
+};
+const catOf = w => w.cat || autoCat(w.type);
 function streaks() {
   const days = new Set(S.workouts.map(w => w.date));
   let cur = 0, d = new Date(); if (!days.has(iso(d))) d.setDate(d.getDate() - 1);
@@ -241,7 +296,7 @@ const weightsSorted = () => [...S.weights].sort((a, b) => a.date.localeCompare(b
 // Rendering
 function render() {
   $("g-w").value = S.goals.weight ?? ""; $("g-wk").value = S.goals.weekly ?? ""; $("g-cal").value = S.goals.cal ?? "";
-  ["w-date", "b-date", "f-date"].forEach(i => { if (!$(i).value) $(i).value = today(); });
+  ["w-date", "b-date", "f-date", "c-date", "j-date"].forEach(i => { if (!$(i).value) $(i).value = today(); });
   const m = minutesByDay(), st = streaks(), ws = weekStart(), ww = weightsSorted();
   const weekCount = new Set(S.workouts.filter(w => w.date >= ws).map(w => w.date)).size;
   const last = ww[ww.length - 1];
@@ -253,15 +308,26 @@ function render() {
     [last ? last.v + " lb" : "None yet", "Latest weight"]
   ].map(([a, b]) => `<div class="stat"><b>${a}</b><span>${b}</span></div>`).join("");
 
-  // Heat grid: columns are weeks, rows are Sun to Sat
-  const start = new Date(); start.setDate(start.getDate() - start.getDay() - 25 * 7);
-  let h = "";
-  for (let i = 0; i < 26 * 7; i++) {
-    const d = new Date(start); d.setDate(start.getDate() + i);
-    const k = iso(d), mins = m[k] || 0;
-    h += d > new Date() ? '<i style="visibility:hidden"></i>' : `<i data-l="${level(mins)}" title="${pretty(k)}: ${mins} min"></i>`;
+  // Heat grid: one row per week (newest on top), Sun to Sat across. Color = day's main category, shade = total minutes.
+  const byDate = {}; S.workouts.forEach(w => (byDate[w.date] = byDate[w.date] || []).push(w));
+  const thisSun = parse(weekStart());
+  let h = "<span></span>" + "SMTWTFS".split("").map(c => `<span style="text-align:center">${c}</span>`).join("");
+  for (let r = gridOff * 10; r < gridOff * 10 + 10; r++) {
+    const rowStart = new Date(thisSun); rowStart.setDate(thisSun.getDate() - r * 7);
+    h += `<span>${rowStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>`;
+    for (let c = 0; c < 7; c++) {
+      const d = new Date(rowStart); d.setDate(rowStart.getDate() + c);
+      if (d > new Date()) { h += '<i style="visibility:hidden"></i>'; continue; }
+      const k = iso(d), dayW = byDate[k] || [], mins = {};
+      dayW.forEach(w => { const cat = catOf(w); mins[cat] = (mins[cat] || 0) + w.dur; });
+      const total = dayW.reduce((a, w) => a + w.dur, 0), top = Object.keys(mins).sort((a, b) => mins[b] - mins[a])[0];
+      const tip = pretty(k) + (total ? ": " + Object.keys(mins).map(x => CATS[x] + " " + mins[x] + " min").join(", ") : ": no activity");
+      h += total ? `<i data-c="${top}" data-l="${level(total)}" title="${tip}"></i>` : `<i title="${tip}"></i>`;
+    }
   }
   $("heat").innerHTML = h;
+  $("g-title").textContent = gridOff ? `Activity, ${gridOff * 10 + 1} to ${gridOff * 10 + 10} weeks ago` : "Activity, latest 10 weeks";
+  $("g-new").disabled = gridOff === 0; $("g-old").disabled = gridOff >= 10;
 
   // Goal progress
   let p = "";
@@ -282,7 +348,7 @@ function render() {
   // Workout list
   const recent = [...S.workouts].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15);
   $("wlist").innerHTML = recent.map(w => {
-    const bits = [w.dur + " min"];
+    const bits = [CATS[catOf(w)], w.dur + " min"];
     if (w.dist) bits.push(w.dist + " mi");
     if (w.intensity) bits.push("intensity " + w.intensity + "/5");
     if (w.lifts && w.lifts.length) bits.push(w.lifts.map(l => `${esc(l.name)} ${l.sets || "?"}x${l.reps || "?"} @ ${l.weight || "?"} lb`).join(", "));
@@ -302,7 +368,7 @@ function render() {
   $("ftoday").innerHTML = (todays.length ? `<b>${tot} calories</b>${g.cal ? ` of ${g.cal} (${g.cal - tot >= 0 ? g.cal - tot + " left" : tot - g.cal + " over"})` : ""}<ul class="list">` + todays.map(f => `<li><div>${f.meal}: ${esc(f.what)}<small>${f.cal} cal</small></div><button class="x" aria-label="Delete food entry" data-delf="${f.id}">&times;</button></li>`).join("") + "</ul>" : '<span class="empty">Nothing logged today yet.</span>');
   const byDay = {}; S.food.forEach(f => byDay[f.date] = (byDay[f.date] || 0) + f.cal);
   $("fdays").innerHTML = Object.keys(byDay).sort().reverse().slice(0, 10).map(k => `<li><span>${pretty(k)}</span><b>${byDay[k]} cal</b></li>`).join("") || '<li class="empty">Daily totals will show up here.</li>';
-  renderPlan();
+  renderPlan(); renderJournal(); renderCheckins();
 }
 // Workout plan: planned sessions by date, checked off automatically when you log a matching workout
 const plans = () => S.plans || (S.plans = []);
@@ -345,6 +411,130 @@ document.body.addEventListener("click", e => {
   }
 });
 ["p-date"].forEach(i => $(i).value = today());
+
+// Journal, typed or dictated
+const journals = () => S.journal || (S.journal = []);
+function renderJournal() {
+  const q = $("j-search").value.trim().toLowerCase();
+  const items = [...journals()].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)).filter(j => !q || (j.title + " " + j.text).toLowerCase().includes(q));
+  $("jlist").innerHTML = items.map(j => `<li><div><b>${esc(j.title || pretty(j.date))}</b>${j.title ? `<small>${pretty(j.date)}</small>` : ""}<div class="entry">${esc(j.text)}</div></div><button class="x" aria-label="Delete entry" data-delj="${j.id}">&times;</button></li>`).join("") || '<li class="empty">No entries yet.</li>';
+}
+$("j-search").oninput = renderJournal;
+$("save-j").onclick = () => {
+  const text = $("j-text").value.trim(); if (!text) return alert("Write something first.");
+  if (rec) rec.stop();
+  journals().push({ id: uid(), date: $("j-date").value || today(), title: $("j-title").value.trim(), text });
+  save(); $("j-text").value = ""; $("j-title").value = ""; render();
+};
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, recBase = "";
+if (!SR) { $("mic").classList.add("hide"); $("mic-status").textContent = "Voice dictation is not available in this browser. The microphone key on your phone keyboard works too."; }
+$("mic").onclick = () => {
+  if (rec) { rec.stop(); return; }
+  const ta = $("j-text"), mic = $("mic"), st = $("mic-status");
+  rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = navigator.language || "en-US";
+  recBase = ta.value + (ta.value && !/\s$/.test(ta.value) ? " " : "");
+  rec.onresult = e => { let t = ""; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; ta.value = recBase + t; };
+  rec.onerror = e => { st.textContent = e.error === "not-allowed" ? "Microphone access was blocked. Allow it in your browser settings." : "Dictation stopped (" + e.error + ")."; };
+  rec.onend = () => { rec = null; mic.textContent = "Start dictating"; mic.setAttribute("aria-pressed", "false"); if (st.textContent === "Listening...") st.textContent = ""; };
+  rec.start(); mic.textContent = "Stop dictating"; mic.setAttribute("aria-pressed", "true"); st.textContent = "Listening...";
+};
+
+// Check-ins: weight, measurements and progress photos. Photos are shrunk, then saved as files in your data repo.
+const checkins = () => S.checkins || (S.checkins = []);
+const MEAS = [["waist", "Waist"], ["chest", "Chest"], ["hips", "Hips"], ["arm", "Arm"], ["thigh", "Thigh"]];
+const PK = "stride-photo-";
+const photoApi = id => `https://api.github.com/repos/${cfg.repo}/contents/photos/${id}.jpg`;
+function resize(file) {
+  return new Promise((ok, fail) => {
+    const img = new Image(), u = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, 800 / Math.max(img.width, img.height)), c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); ok(c.toDataURL("image/jpeg", 0.65));
+    };
+    img.onerror = () => fail(new Error("Could not read that image."));
+    img.src = u;
+  });
+}
+async function putPhoto(id, dataUrl) {
+  let cached = true;
+  try { localStorage.setItem(PK + id, dataUrl); } catch (e) { cached = false; }
+  if (cfg.repo && cfg.token) {
+    const r = await fetch(photoApi(id), { method: "PUT", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify({ message: "Add progress photo", content: dataUrl.split(",")[1] }) });
+    if (!r.ok) throw new Error("Photo upload failed (" + r.status + ").");
+  } else if (!cached) throw new Error("Browser storage is full. Connect GitHub sync (Goals tab) to keep more photos.");
+}
+async function getPhoto(id) {
+  try { const c = localStorage.getItem(PK + id); if (c) return c; } catch (e) {}
+  if (!cfg.repo || !cfg.token) return null;
+  const r = await fetch(photoApi(id), { headers: { ...hdr(), Accept: "application/vnd.github.raw+json" }, cache: "no-store" });
+  if (!r.ok) return null;
+  const blob = new Blob([await r.arrayBuffer()], { type: "image/jpeg" });
+  const d = await new Promise(ok => { const f = new FileReader(); f.onload = () => ok(f.result); f.readAsDataURL(blob); });
+  try { localStorage.setItem(PK + id, d); } catch (e) {}
+  return d;
+}
+async function delPhoto(id) {
+  try { localStorage.removeItem(PK + id); } catch (e) {}
+  if (!cfg.repo || !cfg.token) return;
+  try {
+    const r = await fetch(photoApi(id), { headers: hdr() }); if (!r.ok) return;
+    const j = await r.json();
+    await fetch(photoApi(id), { method: "DELETE", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify({ message: "Remove progress photo", sha: j.sha }) });
+  } catch (e) {}
+}
+$("save-c").onclick = async () => {
+  const btn = $("save-c"), st = $("c-status");
+  const c = { id: uid(), date: $("c-date").value || today(), weight: +$("c-wt").value || null, m: {}, notes: $("c-notes").value.trim(), photos: [] };
+  MEAS.forEach(([k]) => { const v = +$("c-" + k).value; if (v) c.m[k] = v; });
+  const files = [...$("c-photos").files];
+  if (!c.weight && !Object.keys(c.m).length && !files.length && !c.notes) return alert("Add at least a weight, measurement, photo or note.");
+  btn.disabled = true;
+  try {
+    for (let i = 0; i < files.length; i++) { st.textContent = `Saving photo ${i + 1} of ${files.length}...`; const id = uid(); await putPhoto(id, await resize(files[i])); c.photos.push(id); }
+  } catch (e) { st.textContent = e.message; btn.disabled = false; return; }
+  checkins().push(c);
+  if (c.weight) { S.weights = S.weights.filter(w => w.date !== c.date); S.weights.push({ date: c.date, v: c.weight }); }
+  save(); ["c-wt", "c-notes", ...MEAS.map(([k]) => "c-" + k)].forEach(i => $(i).value = ""); $("c-photos").value = ""; st.textContent = ""; btn.disabled = false; render();
+};
+function renderCheckins() {
+  const cs = [...checkins()].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  const g = S.goals.weight, ww = weightsSorted();
+  const startW = (cs.find(c => c.weight) || {}).weight || (ww[0] || {}).v, nowW = ww.length ? ww[ww.length - 1].v : null;
+  if (startW && nowW && g) {
+    const total = startW - g, pc = total === 0 ? 100 : Math.max(0, Math.min(100, (startW - nowW) / total * 100));
+    $("tl-sum").innerHTML = `Start ${startW} lb, now ${nowW} lb, goal ${g} lb (${Math.abs(nowW - g).toFixed(1)} lb to go)<div class="bar"><div style="width:${pc}%"></div></div><small class="delta">${cs.length} check-in${cs.length === 1 ? "" : "s"}${cs.length ? ", latest " + pretty(cs[cs.length - 1].date) : ""}</small>`;
+  } else $("tl-sum").innerHTML = '<span class="empty">Set a goal weight on the Goals tab and log a check-in to see your progress.</span>';
+  const last = {};
+  const rows = cs.map(c => {
+    const lines = [];
+    if (c.weight) {
+      const d = last.weight != null ? c.weight - last.weight : null; last.weight = c.weight;
+      lines.push(`<b>${c.weight} lb</b>` + (d != null ? ` <span class="delta">(${d > 0 ? "+" : ""}${d.toFixed(1)} since last)</span>` : "") + (g ? ` <span class="delta">${Math.abs(c.weight - g).toFixed(1)} lb from goal</span>` : ""));
+    }
+    const ms = MEAS.filter(([k]) => c.m[k]).map(([k, n]) => { const d = last[k] != null ? c.m[k] - last[k] : null; last[k] = c.m[k]; return `${n} ${c.m[k]} in` + (d ? ` <span class="delta">(${d > 0 ? "+" : ""}${d.toFixed(1)})</span>` : ""); });
+    if (ms.length) lines.push(ms.join(", "));
+    if (c.notes) lines.push(`<span class="entry">${esc(c.notes)}</span>`);
+    return `<li><div class="when">${pretty(c.date)} <button class="x" aria-label="Delete check-in" data-delc="${c.id}">&times;</button></div>${lines.join("<br>")}` +
+      (c.photos.length ? `<div class="thumbs">${c.photos.map(p => `<img data-pid="${p}" alt="Progress photo from ${pretty(c.date)}">`).join("")}</div>` : "") + "</li>";
+  }).reverse();
+  if (g) rows.unshift(`<li><div class="when">Goal</div>Reach ${g} lb</li>`);
+  $("tl").innerHTML = rows.join("") || '<li class="empty">No check-ins yet. Add your first one above.</li>';
+  document.querySelectorAll("#tl img[data-pid]").forEach(img => getPhoto(img.dataset.pid).then(d => { if (d) img.src = d; else img.title = "Photo not available on this device"; }).catch(() => {}));
+}
+document.body.addEventListener("click", e => {
+  const d = e.target.dataset;
+  if (d.delj) { S.journal = journals().filter(j => j.id !== d.delj); save(); render(); }
+  if (d.delc && confirm("Delete this check-in and its photos?")) {
+    const c = checkins().find(x => x.id === d.delc); S.checkins = checkins().filter(x => x.id !== d.delc);
+    (c ? c.photos : []).forEach(delPhoto); save(); render();
+  }
+  if (d.pid) e.target.classList.toggle("big");
+});
+
+$("g-old").onclick = () => { gridOff++; render(); };
+$("g-new").onclick = () => { if (gridOff > 0) gridOff--; render(); };
 
 // GitHub sync: data.json in a repo you choose, read and written through the GitHub API
 const SK = "stride-sync";
